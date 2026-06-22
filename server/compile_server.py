@@ -32,6 +32,9 @@ RATE_WINDOW = int(os.environ.get("RATE_WINDOW", "60"))
 MAX_CONCURRENT = int(os.environ.get("MAX_CONCURRENT", "2"))
 COMPILE_TIMEOUT = int(os.environ.get("COMPILE_TIMEOUT", "280"))
 MAX_CODE = 256 * 1024
+# CORS: leave empty in the cloud (Caddy adds CORS). For the local/offline server
+# there's no proxy, so set CORS_ORIGIN (e.g. "*") to let the browser PWA call it.
+CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "")
 
 # Board alias -> fully-qualified board name. esp8266 uses the NodeMCU variant so
 # the D0–D8 / LED_BUILTIN constants resolve; the bare esp32 board uses raw GPIO.
@@ -99,16 +102,30 @@ def parse_intel_hex(text):
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
+    def _cors(self):
+        if CORS_ORIGIN:
+            self.send_header("Access-Control-Allow-Origin", CORS_ORIGIN)
+            self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
     def _send(self, code, obj):
         body = json.dumps(obj).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        self._cors()
         self.end_headers()
         self.wfile.write(body)
 
     def log_message(self, *args):
         pass  # quiet by default
+
+    def do_OPTIONS(self):
+        # CORS preflight (only relevant when CORS_ORIGIN is set / local mode)
+        self.send_response(204)
+        self._cors()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_GET(self):
         if self.path == "/health":

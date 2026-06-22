@@ -133,6 +133,17 @@ and opens ports 80/443, then you run the provision script:
 - [`deploy/aws/`](deploy/aws/) — AWS EC2 (`t4g.small` free trial / `t2.micro`)
 - [`deploy/azure/`](deploy/azure/) — Azure VM (`Standard_B1s` 12-month free)
 
+### Run it locally / fully offline
+
+For classrooms with no internet, run the **same** server on the local machine so
+a (service-worker-cached) PWA can compile against `http://localhost:3000` with no
+cloud at all — Linux, macOS, **and Windows**. See [`local/`](local/).
+
+```bash
+bash local/install.sh                       # Linux / macOS
+powershell -File local\install.ps1          # Windows (PowerShell + winget)
+```
+
 ### Cloud free-tier comparison
 
 | | Oracle Always Free | AWS Free | Azure Free |
