@@ -1,0 +1,16 @@
+# Secrets & keys — never commit
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Build artifacts
+build/
+*.hex
+*.bin
+__pycache__/

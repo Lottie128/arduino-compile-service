@@ -1,0 +1,37 @@
+# Containerised deployment: compile server + Caddy (automatic HTTPS).
+#
+#   COMPILE_TOKEN=$(openssl rand -hex 24) DOMAIN=compile.example.com \
+#     docker compose up -d --build
+#
+# DOMAIN must resolve to this host's public IP, and ports 80+443 must be open
+# at both the OS firewall and the cloud network layer.
+services:
+  compiler:
+    build: ./server
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      COMPILE_TOKEN: ${COMPILE_TOKEN:?set COMPILE_TOKEN}
+      RATE_MAX: ${RATE_MAX:-20}
+      MAX_CONCURRENT: ${MAX_CONCURRENT:-2}
+    expose:
+      - "3000"          # internal only — not published to the host
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [compiler]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

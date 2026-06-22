@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ShellCheck (bash scripts)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          find . -name '*.sh' -print0 | xargs -0 shellcheck -e SC1091
+
+      - name: Python syntax + compile
+        run: python3 -m py_compile server/compile_server.py
+
+      - name: Validate compose + Dockerfile
+        run: |
+          docker compose config -q
+          docker run --rm -i hadolint/hadolint < server/Dockerfile || true

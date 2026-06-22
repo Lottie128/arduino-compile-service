@@ -1,0 +1,9 @@
+#cloud-config
+# Azure custom-data: self-provision the compile service on first boot.
+# 01-create-instance.sh substitutes __COMPILE_TOKEN__ and __DOMAIN__.
+package_update: true
+packages:
+  - git
+runcmd:
+  - git clone https://github.com/Lottie128/arduino-compile-service.git /opt/arduino-compile-service
+  - COMPILE_TOKEN="__COMPILE_TOKEN__" DOMAIN="__DOMAIN__" bash /opt/arduino-compile-service/deploy/common/provision.sh

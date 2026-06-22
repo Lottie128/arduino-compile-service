@@ -1,0 +1,21 @@
+# Reference unit (provision.sh generates this with your values filled in).
+# Install to /etc/systemd/system/compiler.service then:
+#   systemctl daemon-reload && systemctl enable --now compiler
+[Unit]
+Description=Arduino/ESP compile server
+After=network.target
+
+[Service]
+User=ubuntu
+Environment=COMPILE_TOKEN=CHANGE_ME
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+# Optional tuning:
+# Environment=RATE_MAX=20
+# Environment=MAX_CONCURRENT=2
+ExecStart=/usr/bin/python3 /opt/compiler/compile_server.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

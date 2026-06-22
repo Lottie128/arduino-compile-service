@@ -1,0 +1,12 @@
+# Optional keep-alive: a light periodic compile that generates CPU/network so
+# free-tier providers (notably Oracle Always Free) don't flag the VM as idle and
+# reclaim it — and keeps the build cache warm.
+#
+# Install keepalive.service + keepalive.timer to /etc/systemd/system/ then:
+#   systemctl daemon-reload && systemctl enable --now keepalive.timer
+[Unit]
+Description=Compile-server keep-alive (anti idle-reclaim + cache warm)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/curl -fsS --max-time 60 http://127.0.0.1:3000/health

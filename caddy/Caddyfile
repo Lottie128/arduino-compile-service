@@ -1,0 +1,20 @@
+# Caddy config for the Docker Compose deployment.
+# {$DOMAIN} is injected from the environment; Caddy provisions a Let's Encrypt
+# certificate automatically (needs ports 80 + 443 reachable from the internet).
+#
+# For a tip-free public IP (no domain), use an sslip.io host, e.g.
+#   DOMAIN=203-0-113-5.sslip.io   (resolves 203.0.113.5)
+{$DOMAIN} {
+	# Preflight: short-circuit CORS OPTIONS
+	@options method OPTIONS
+	respond @options 204
+
+	header {
+		Access-Control-Allow-Origin "*"
+		Access-Control-Allow-Methods "POST, GET, OPTIONS"
+		Access-Control-Allow-Headers "Content-Type"
+		-Server
+	}
+
+	reverse_proxy compiler:3000
+}
