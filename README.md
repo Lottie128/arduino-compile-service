@@ -159,6 +159,37 @@ powershell -File local\install.ps1          # Windows (PowerShell + winget)
 
 ---
 
+## Troubleshooting
+
+### "Could not reach the bootloader" — ESP uploads work, AVR (Uno/Nano) refused
+This is a **client-side flashing** symptom, not a compile-server fault — the
+server returns correct ready-to-flash bytes for AVR (Intel HEX → binary) and
+ESP (raw `.bin`) alike. ESP flashing uses `esptool-js` (which owns its own serial
+reads), while AVR flashing speaks STK500v1 over Web Serial in the client.
+
+The bug (fixed 2026-06-23): the client's Web Serial reader raced
+`reader.read()` against a timeout that **abandoned** the pending read. The next
+read issued a second, overlapping `read()`, so the bootloader's `STK_INSYNC /
+STK_OK` sync reply was delivered to the abandoned read and silently dropped — the
+Uno *was* answering, the client just never saw it. Every AVR upload then looked
+like "no bootloader".
+
+Fix (in the browser client's `webserial.ts`):
+- A **single background read pump** fills a rolling byte buffer; the protocol
+  polls that buffer — no overlapping `read()` calls.
+- A proper **auto-reset pulse** (assert DTR/RTS → release) tried two ways:
+  classic **DTR+RTS** and **DTR-only** (some CH340 clones mishandle RTS).
+- A **complete STK500v1 handshake**: `ENTER_PROGMODE` → per-page
+  `LOAD_ADDRESS` + `PROG_PAGE` (each acknowledged) → `LEAVE_PROGMODE`, with the
+  serial monitor always restored afterward.
+
+If a particular **CH340 clone** still won't auto-reset (some lack the reset
+capacitor), press the board's **RESET** button just as you click Upload.
+
+See [`CHANGELOG.md`](CHANGELOG.md).
+
+---
+
 ## Repository layout
 
 ```
