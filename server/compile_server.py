@@ -13,11 +13,18 @@ Configuration (environment variables):
   RATE_WINDOW      rate-limit window in seconds (default 60)
   MAX_CONCURRENT   simultaneous compiles (default 2 — protects small boxes)
   COMPILE_TIMEOUT  per-compile subprocess timeout in seconds (default 280)
+  BUILD_CACHE_DIR  persistent --build-path root, one dir per (board, slot)
+                   (default /tmp/arduino-build-cache). Only the board's core
+                   and library objects get reused across requests — each
+                   request's own sketch.ino always lives in a fresh temp dir,
+                   so it always recompiles; this just skips rebuilding the
+                   (identical, much bigger) core every single time.
 """
 import base64
 import glob
 import json
 import os
+import queue
 import subprocess
 import tempfile
 import threading
@@ -31,6 +38,7 @@ RATE_MAX = int(os.environ.get("RATE_MAX", "20"))
 RATE_WINDOW = int(os.environ.get("RATE_WINDOW", "60"))
 MAX_CONCURRENT = int(os.environ.get("MAX_CONCURRENT", "2"))
 COMPILE_TIMEOUT = int(os.environ.get("COMPILE_TIMEOUT", "280"))
+BUILD_CACHE_DIR = os.environ.get("BUILD_CACHE_DIR", "/tmp/arduino-build-cache")
 MAX_CODE = 256 * 1024
 # CORS: leave empty in the cloud (Caddy adds CORS). For the local/offline server
 # there's no proxy, so set CORS_ORIGIN (e.g. "*") to let the browser PWA call it.
@@ -45,7 +53,13 @@ FQBN = {
 }
 
 # ── Abuse protection ─────────────────────────────────────────────────────────
-_sem = threading.BoundedSemaphore(MAX_CONCURRENT)
+# A pool of MAX_CONCURRENT numbered slots, not a bare semaphore: each slot also
+# owns a persistent build-cache directory (see BUILD_CACHE_DIR above), so the
+# same slot's core/library objects survive across requests instead of being
+# rebuilt from scratch on every compile.
+_slots = queue.Queue()
+for _i in range(MAX_CONCURRENT):
+    _slots.put(_i)
 _hits = {}
 _hits_lock = threading.Lock()
 
@@ -165,18 +179,23 @@ class Handler(BaseHTTPRequestHandler):
                 f.write(code)
             out = os.path.join(d, "build")
 
-            if not _sem.acquire(timeout=45):
+            try:
+                slot = _slots.get(timeout=45)
+            except queue.Empty:
                 return self._send(429, {"status": "error",
                                         "message": "Compiler busy — try again in a moment."})
             try:
+                build_path = os.path.join(BUILD_CACHE_DIR, req.get("board") or "uno", f"slot{slot}")
+                os.makedirs(build_path, exist_ok=True)
                 p = subprocess.run(
-                    ["arduino-cli", "compile", "--fqbn", fqbn, "--output-dir", out, sk],
+                    ["arduino-cli", "compile", "--fqbn", fqbn,
+                     "--build-path", build_path, "--output-dir", out, sk],
                     capture_output=True, text=True, timeout=COMPILE_TIMEOUT,
                 )
             except subprocess.TimeoutExpired:
                 return self._send(504, {"status": "error", "message": "compile timed out"})
             finally:
-                _sem.release()
+                _slots.put(slot)
 
             if p.returncode != 0:
                 msg = (p.stderr or p.stdout or "compile failed").strip()[-1500:]
