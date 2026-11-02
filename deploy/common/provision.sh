@@ -62,9 +62,14 @@ run_cli core update-index
 run_cli core install arduino:avr
 run_cli core install esp8266:esp8266
 run_cli core install esp32:esp32
-for lib in "Servo" "DHT sensor library" "LiquidCrystal I2C" "Adafruit NeoPixel"; do
+for lib in "Servo" "ESP32Servo" "DHT sensor library" "LiquidCrystal I2C" "Adafruit NeoPixel"; do
   run_cli lib install "$lib" || true
 done
+# The official Servo library's ESP32 backend fails to compile against esp32
+# core 3.3.x (a renamed ESP-IDF SOC macro) — ESP32Servo is the community-
+# standard, API-compatible replacement. Generated sketches should
+# #if defined(ESP32) #include <ESP32Servo.h> #else #include <Servo.h> #endif
+# rather than including Servo.h unconditionally.
 
 # ── 4. Warm the build cache so the first real compile is fast ──────────────────
 log "Warming build caches"
