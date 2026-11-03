@@ -20,6 +20,12 @@ jobs:
         run: python3 -m py_compile server/compile_server.py
 
       - name: Validate compose + Dockerfile
+        # COMPILE_TOKEN/DOMAIN are intentionally required (docker-compose.yml's
+        # `:?` syntax) for a real deploy — CI only needs *some* value to let
+        # `compose config` syntax-check the file, never an actual secret.
+        env:
+          COMPILE_TOKEN: ci-lint-placeholder
+          DOMAIN: ci-lint-placeholder.example.com
         run: |
           docker compose config -q
           docker run --rm -i hadolint/hadolint < server/Dockerfile || true
